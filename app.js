@@ -329,6 +329,6 @@ app.get('/search', (req, res) => {
 });
 
 
+const PORT = process.env.PORT || 5000;
 
-
-app.listen(5000,() => console.log("Localhost is running on port 5000."))
+app.listen(PORT,() => console.log("Localhost is running on port 5000."))
