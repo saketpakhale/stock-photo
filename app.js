@@ -19,7 +19,9 @@ app.use(express.static(path.join(__dirname, 'photoStorage')));
 
 
 mongoose.set("strictQuery", false);
-const userDB = mongoose.connect("mongodb://0.0.0.0:27017/userDB");
+const mongopass = process.env.MONGODB_SECRET;
+const userDB = mongoose.connect(`mongodb+srv://saketpakhale:${mongopass}@cluster0.i2pmeyw.mongodb.net/userDB`);
+
 
 
 const gallerySchema = new mongoose.Schema ({
@@ -58,7 +60,6 @@ app.post("/signup", async (req,res) => {
     
     User.findOne({email: req.body.email}).then(async found => {
         if(!found) {
-            console.log(req.body);
             const user1 = new User(req.body);
             await user1.save();
             res.send(req.body);            
@@ -209,7 +210,6 @@ app.post("/profile/gallery", auth, async (req, res) => {
 app.post("/profile/profilePhoto", auth, (req, res) => {
   const id = req.userId;
   const photoUrl = req.body.profilePhoto;
-  console.log(photoUrl);
 
   User.findOne({ _id: id }).then(async (found) => {
     if (found) {
@@ -241,7 +241,6 @@ app.post("/profile/profilePhoto", auth, (req, res) => {
 app.delete("/profile/gallery",auth, (req, res) => {
   const userId = req.userId;
   const { photoUrl } = req.body;
-  console.log(req.body);
   User.findOne({ _id: userId }).populate('profile.photoGallery').then(async (found) => {
     if (found) {
       if (found.profile && found.profile.photoGallery.length > 0) {
