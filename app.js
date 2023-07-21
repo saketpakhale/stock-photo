@@ -56,44 +56,53 @@ const userSchema = new mongoose.Schema ({
 const User = new mongoose.model("User", userSchema);
 
 
-app.post("/signup", async (req,res) => {
-    
-    User.findOne({email: req.body.email}).then(async found => {
-        if(!found) {
-            const user1 = new User(req.body);
-            await user1.save();
-            res.send(req.body);            
-        } else {
-          res.send({})
-        }
-        
-    })
-    
+app.post("/signup", async (req, res) => {
+  try {
+    const found = await User.findOne({ email: req.body.email });
+
+    if (!found) {
+      const user1 = new User(req.body);
+      await user1.save();
+      res.send(req.body);
+    } else {
+      res.send({});
+    }
+  } catch (error) {
+    res.status(500).send("An error occurred during signup.");
+  }
 });
 
-app.post("/login", async (req,res) => {
+
+app.post("/login", async (req, res) => {
+  try {
     const mail = req.body.email;
     const pass = req.body.password;
-    User.findOne({email:mail}).then(found => {
-        if(found) {
-            if(found.password===pass) {
-                const token = jwt.sign({id: found._id},JWT_SECRET);            
-                res.json({ token });
-            } else {
-                res.send({result: "Incorrect Password"});
-            }
-            
-        } else {
-            res.send({result: "User Not Found"})
-        }
-    })
-})
+
+    const found = await User.findOne({ email: mail });
+
+    if (found) {
+      if (found.password === pass) {
+        const token = jwt.sign({ id: found._id }, JWT_SECRET);
+        res.json({ token });
+      } else {
+        res.send({ result: "Incorrect Password" });
+      }
+    } else {
+      res.send({ result: "User Not Found" });
+    }
+  } catch (error) {
+    res.status(500).send("An error occurred during login.");
+  }
+});
 
 
 
-app.get("/profile",auth, (req, res) => {
-  const id = req.userId;
-  User.findOne({ _id: id }).populate('profile.photoGallery').then(async (found) => {
+
+app.get("/profile", auth, async (req, res) => {
+  try {
+    const id = req.userId;
+    const found = await User.findOne({ _id: id }).populate('profile.photoGallery');
+
     if (found) {
       if (found.profile) {
         const photoUrls = found.profile.photoGallery.map(
@@ -103,7 +112,7 @@ app.get("/profile",auth, (req, res) => {
           username: found.profile.username,
           bio: found.profile.bio,
           profilePhoto: found.profile.profilePhoto,
-          photoGallery: { photoUrl: photoUrls  },
+          photoGallery: { photoUrl: photoUrls },
         };
 
         res.send(profileData);
@@ -113,48 +122,58 @@ app.get("/profile",auth, (req, res) => {
     } else {
       res.status(404).send({ error: "User not found" });
     }
-  });
+  } catch (error) {
+    res.status(500).send("An error occurred while fetching the profile.");
+  }
 });
 
 
-app.post("/profile", auth, (req, res) => {
+
+app.post("/profile", auth, async (req, res) => {
+  try {
     const id = req.userId;
-    User.findOne({ _id: id }).then(async (found) => {
-      if (found) {
-        if (found.profile) {
-          found.profile.username = req.body.usernameText;
-          found.profile.bio = req.body.bioText;
-          await found.save();
-        } else {
-          const newProfile = new Profile({
-            username: req.body.usernameText,
-            bio: req.body.bioText,
-          });
-          await newProfile.save();
-          found.profile = newProfile;
-          await found.save();
-        }
-        res.send({ success: true });
+    const found = await User.findOne({ _id: id });
+
+    if (found) {
+      if (found.profile) {
+        found.profile.username = req.body.usernameText;
+        found.profile.bio = req.body.bioText;
+        await found.save();
       } else {
-        res.status(404).send({ error: "User not found" });
+        const newProfile = new Profile({
+          username: req.body.usernameText,
+          bio: req.body.bioText,
+        });
+        await newProfile.save();
+        found.profile = newProfile;
+        await found.save();
       }
-    });
-  });
-  
+      res.send({ success: true });
+    } else {
+      res.status(404).send({ error: "User not found" });
+    }
+  } catch (error) {
+    res.status(500).send("An error occurred while updating the profile.");
+  }
+});
+
 
 
 
 app.post("/profile/gallery", auth, async (req, res) => {
-  const id = req.userId;
-  const photoUrl = req.body.url;
-  const sp = req.body.price;
-  const words = req.body.keywords;
-  const keywords = words.split(", ");
-  const category = req.body.category;
-  const width = req.body.width;
-  const height = req.body.height;
-  const orientation = width > height ? "horizontal" : "vertical";
-  User.findOne({ _id: id }).then(async (found) => {
+  try {
+    const id = req.userId;
+    const photoUrl = req.body.url;
+    const sp = req.body.price;
+    const words = req.body.keywords;
+    const keywords = words.split(", ");
+    const category = req.body.category;
+    const width = req.body.width;
+    const height = req.body.height;
+    const orientation = width > height ? "horizontal" : "vertical";
+
+    const found = await User.findOne({ _id: id });
+
     if (found) {
       if (found.profile) {
         if (found.profile.photoGallery.length > 0) {
@@ -163,7 +182,7 @@ app.post("/profile/gallery", auth, async (req, res) => {
             sp: sp,
             keywords: keywords,
             category: category,
-            size: [height,width],
+            size: [height, width],
             orientation: orientation
           });
         } else {
@@ -172,12 +191,11 @@ app.post("/profile/gallery", auth, async (req, res) => {
             sp: sp,
             keywords: keywords,
             category: category,
-            size: [height,width],
+            size: [height, width],
             orientation: orientation
           });
           await gallery.save();
           found.profile.photoGallery = [gallery];
-          await found.save();
         }
       } else {
         const gallery = new Gallery({
@@ -185,7 +203,7 @@ app.post("/profile/gallery", auth, async (req, res) => {
           sp: sp,
           keywords: keywords,
           category: category,
-          size: [height,width],
+          size: [height, width],
           orientation: orientation
         });
         await gallery.save();
@@ -202,20 +220,22 @@ app.post("/profile/gallery", auth, async (req, res) => {
     } else {
       res.status(404).send({ error: "User not found" });
     }
-  }).catch((error) => {
+  } catch (error) {
     res.status(500).send({ error: "Internal server error" });
-  });
+  }
 });
 
-app.post("/profile/profilePhoto", auth, (req, res) => {
-  const id = req.userId;
-  const photoUrl = req.body.profilePhoto;
 
-  User.findOne({ _id: id }).then(async (found) => {
+app.post("/profile/profilePhoto", auth, async (req, res) => {
+  try {
+    const id = req.userId;
+    const photoUrl = req.body.profilePhoto;
+
+    const found = await User.findOne({ _id: id });
+
     if (found) {
       if (found.profile) {
         found.profile.profilePhoto = photoUrl;
-        
       } else {
         const profile = new Profile({
           username: "Username",
@@ -223,7 +243,6 @@ app.post("/profile/profilePhoto", auth, (req, res) => {
           profilePhoto: photoUrl
         });
         await profile.save();
-        
         found.profile = profile;
       }
       await found.save();
@@ -231,17 +250,20 @@ app.post("/profile/profilePhoto", auth, (req, res) => {
     } else {
       res.status(404).send({ error: "User not found" });
     }
-  }).catch((error) => {
+  } catch (error) {
     res.status(500).send({ error: "Internal server error" });
-  });
+  }
 });
 
 
 
-app.delete("/profile/gallery",auth, (req, res) => {
-  const userId = req.userId;
-  const { photoUrl } = req.body;
-  User.findOne({ _id: userId }).populate('profile.photoGallery').then(async (found) => {
+app.delete("/profile/gallery", auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { photoUrl } = req.body;
+
+    const found = await User.findOne({ _id: userId }).populate('profile.photoGallery');
+
     if (found) {
       if (found.profile && found.profile.photoGallery.length > 0) {
         const photoGallery = found.profile.photoGallery;
@@ -257,44 +279,52 @@ app.delete("/profile/gallery",auth, (req, res) => {
     } else {
       res.status(404).send({ error: "User not found" });
     }
-  }).catch((error) => {
+  } catch (error) {
     res.status(500).send({ error: "Internal server error" });
-  });
+  }
 });
 
 
-app.get("/", (req, res) => {
-  User.find({}).populate('profile.photoGallery').then(async (users) => {
+
+app.get("/", async (req, res) => {
+  try {
+    const users = await User.find({}).populate('profile.photoGallery');
+
     const allPhotos = users.reduce((photos, user) => {
       if (user.profile && user.profile.photoGallery) {
-        const userPhotos = user.profile.photoGallery.map((gallery) => ({
-          username: user.profile.username,
-          userId: user._id,
-          photoUrl: gallery.url,
-          photoId: gallery._id,
-          sp: gallery.sp,
-          keywords: gallery.keywords,
-          category: gallery.category,
-          size: gallery.size,
-          orientation: gallery.orientation          
-        })).filter((photo) => photo.photoUrl !== '');
+        const userPhotos = user.profile.photoGallery
+          .map((gallery) => ({
+            username: user.profile.username,
+            userId: user._id,
+            photoUrl: gallery.url,
+            photoId: gallery._id,
+            sp: gallery.sp,
+            keywords: gallery.keywords,
+            category: gallery.category,
+            size: gallery.size,
+            orientation: gallery.orientation          
+          }))
+          .filter((photo) => photo.photoUrl !== '');
         photos.push(...userPhotos);
       }
       return photos;
     }, []);
 
     res.send(allPhotos);
-  }).catch((error) => {
+  } catch (error) {
     res.status(500).send({ error: "Internal server error" });
-  });
+  }
 });
 
 
 
-app.get('/search', (req, res) => {
-  const query = req.query.query;
 
-  User.find({}).populate('profile.photoGallery').then(async (users) => {
+app.get('/search', async (req, res) => {
+  try {
+    const query = req.query.query;
+
+    const users = await User.find({}).populate('profile.photoGallery');
+
     const searchResults = users.reduce((photos, user) => {
       if (user.profile && user.profile.photoGallery) {
         const userPhotos = user.profile.photoGallery
@@ -314,7 +344,7 @@ app.get('/search', (req, res) => {
             keywords: gallery.keywords,
             category: gallery.category,
             size: gallery.size,
-            orientation: gallery.orientation, 
+            orientation: gallery.orientation,
           }));
 
         photos.push(...userPhotos);
@@ -323,10 +353,11 @@ app.get('/search', (req, res) => {
     }, []);
 
     res.send(searchResults);
-  }).catch((error) => {
+  } catch (error) {
     res.status(500).send({ error: "Internal server error" });
-  });
+  }
 });
+
 
 
 const PORT = process.env.PORT || 5000;
